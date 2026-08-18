@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>后台登录</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --primary: #2563eb;
+      --danger: #ef4444;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: #334155;
+        --primary: #3b82f6;
+        --danger: #f87171;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .login-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    h2 { margin-bottom: 1.5rem; text-align: center; }
+    .input-group { margin-bottom: 1.25rem; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; }
+    input {
+      width: 100%;
+      padding: 0.7rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+      font-size: 1rem;
+      outline: none;
+    }
+    input:focus { border-color: var(--primary); }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover { opacity: 0.9; }
+    .error-msg {
+      color: var(--danger);
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+      text-align: center;
+      display: none;
+    }
+    .back-home {
+      display: block;
+      text-align: center;
+      margin-top: 1.2rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .back-home:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <h2>🔐 管理员登录</h2>
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="input-group">
+        <label for="token">管理密钥 (ADMIN_TOKEN)</label>
+        <input type="password" id="token" placeholder="请输入密钥" required autofocus>
+      </div>
+      <button type="submit" id="submitBtn">登录</button>
+      <div id="errorMsg" class="error-msg"></div>
+    </form>
+    <a href="/" class="back-home">← 返回导航首页</a>
+  </div>
+
+  <script>
+    async function handleLogin(e) {
+      e.preventDefault();
+      const token = document.getElementById('token').value.trim();
+      const errorMsg = document.getElementById('errorMsg');
+      const submitBtn = document.getElementById('submitBtn');
+
+      errorMsg.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '验证中...';
+
+      try {
+        const res = await fetch('/api/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.ok) {
+          localStorage.setItem('CF_ADMIN_TOKEN', token);
+          window.location.href = '/admin.html';
+        } else {
+          const data = await res.json();
+          errorMsg.textContent = data.error || '密钥错误';
+          errorMsg.style.display = 'block';
+        }
+      } catch (err) {
+        errorMsg.textContent = '网络错误，请稍后重试';
+        errorMsg.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '登录';
+      }
+    }
+  </script>
+</body>
+</html>
