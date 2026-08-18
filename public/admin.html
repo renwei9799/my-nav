@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>导航后台管理</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --primary: #2563eb;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: #334155;
+        --primary: #3b82f6;
+        --danger: #f87171;
+        --success: #34d399;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+    .container { width: 100%; max-width: 900px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .btn-group { display: flex; gap: 0.5rem; align-items: center; }
+    button {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      background: var(--primary);
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    button.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    button.danger { background: var(--danger); }
+    
+    .token-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .token-bar input { flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; }
+
+    .cat-block {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .cat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      gap: 0.5rem;
+    }
+    .cat-name-input {
+      font-size: 1.1rem;
+      font-weight: bold;
+      padding: 0.4rem 0.6rem;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+    }
+
+    .item-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .item-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      background: var(--bg);
+      padding: 0.75rem;
+      border-radius: 8px;
+      flex-wrap: wrap;
+    }
+    .item-row input {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--card);
+      color: inherit;
+      font-size: 0.85rem;
+    }
+    .item-row .input-name { flex: 1; min-width: 100px; }
+    .item-row .input-url { flex: 2; min-width: 180px; }
+    .item-row .input-desc { flex: 2; min-width: 150px; }
+
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #1e293b;
+      color: white;
+      padding: 0.75rem 1.25rem;
+      border-radius: 6px;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h2>⚙️ 导航站数据管理</h2>
+      <div class="btn-group">
+        <a href="/" target="_blank"><button class="secondary">👀 预览前台</button></a>
+        <button onclick="addCategory()">➕ 添加分类</button>
+        <button onclick="saveToCloud()" style="background: var(--success);">💾 保存到云端</button>
+      </div>
+    </header>
+
+    <div class="token-bar">
+      <label><strong>管理密钥 (Token):</strong></label>
+      <input type="password" id="adminToken" placeholder="输入你在 CF Pages 环境变量配置的 ADMIN_TOKEN">
+    </div>
+
+    <div id="categoryContainer"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    let navData = [];
+
+    function showToast(msg, duration = 3000) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, duration);
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch('/api/nav');
+        if (res.ok) {
+          navData = await res.json();
+          renderEditor();
+        }
+      } catch (err) {
+        showToast('从边缘加载数据失败');
+      }
+    }
+
+    function renderEditor() {
+      const container = document.getElementById('categoryContainer');
+      container.innerHTML = '';
+
+      navData.forEach((cat, catIdx) => {
+        const catBlock = document.createElement('div');
+        catBlock.className = 'cat-block';
+
+        const catHeader = document.createElement('div');
+        catHeader.className = 'cat-header';
+
+        const catNameInput = document.createElement('input');
+        catNameInput.className = 'cat-name-input';
+        catNameInput.value = cat.category || '新分类';
+        catNameInput.onchange = (e) => { navData[catIdx].category = e.target.value; };
+
+        const catActions = document.createElement('div');
+        catActions.className = 'btn-group';
+        catActions.innerHTML = `
+          <button class="secondary" onclick="addItem(${catIdx})">➕ 添加书签</button>
+          <button class="danger" onclick="removeCategory(${catIdx})">🗑️ 删除分类</button>
+        `;
+
+        catHeader.appendChild(catNameInput);
+        catHeader.appendChild(catActions);
+        catBlock.appendChild(catHeader);
+
+        const itemList = document.createElement('div');
+        itemList.className = 'item-list';
+
+        (cat.items || []).forEach((item, itemIdx) => {
+          const row = document.createElement('div');
+          row.className = 'item-row';
+          row.innerHTML = `
+            <input class="input-name" placeholder="网站名称" value="${item.name || ''}" onchange="updateItem(${catIdx},${itemIdx}, 'name', this.value)">
+            <input class="input-url" placeholder="https://..." value="${item.url || ''}" onchange="updateItem(${catIdx},${itemIdx}, 'url', this.value)">
+            <input class="input-desc" placeholder="简要描述" value="${item.desc || ''}" onchange="updateItem(${catIdx},${itemIdx}, 'desc', this.value)">
+            <button class="danger" style="padding: 0.35rem 0.6rem;" onclick="removeItem(${catIdx},${itemIdx})">✕</button>
+          `;
+          itemList.appendChild(row);
+        });
+
+        catBlock.appendChild(itemList);
+        container.appendChild(catBlock);
+      });
+    }
+
+    function addCategory() {
+      navData.push({ category: "新建分类", items: [] });
+      renderEditor();
+    }
+
+    function removeCategory(catIdx) {
+      if (confirm('确定删除此分类及其所有书签吗？')) {
+        navData.splice(catIdx, 1);
+        renderEditor();
+      }
+    }
+
+    function addItem(catIdx) {
+      if (!navData[catIdx].items) navData[catIdx].items = [];
+      navData[catIdx].items.push({ name: '', url: 'https://', desc: '' });
+      renderEditor();
+    }
+
+    function removeItem(catIdx, itemIdx) {
+      navData[catIdx].items.splice(itemIdx, 1);
+      renderEditor();
+    }
+
+    function updateItem(catIdx, itemIdx, key, val) {
+      navData[catIdx].items[itemIdx][key] = val;
+    }
+
+    async function saveToCloud() {
+      const token = document.getElementById('adminToken').value.trim();
+      if (!token) {
+        showToast('请先输入管理密钥 (Token)');
+        return;
+      }
+      localStorage.setItem('CF_ADMIN_TOKEN', token);
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(navData)
+        });
+
+        if (res.ok) {
+          showToast('🎉 保存成功！已同步至全球边缘节点');
+        } else {
+          const err = await res.json();
+          showToast(`❌ 保存失败: ${err.error || '未授权'}`);
+        }
+      } catch (e) {
+        showToast('❌ 网络错误，保存失败');
+      }
+    }
+
+    // 初始化加载 Token 与数据
+    const savedToken = localStorage.getItem('CF_ADMIN_TOKEN');
+    if (savedToken) document.getElementById('adminToken').value = savedToken;
+    loadData();
+  </script>
+</body>
+</html>
